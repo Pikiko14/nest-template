@@ -1,7 +1,10 @@
 import {
   Controller,
+  Get,
   NotFoundException,
+  Param,
   Post,
+  Res,
   UnprocessableEntityException,
   UploadedFile,
   UseInterceptors,
@@ -10,6 +13,7 @@ import { diskStorage } from 'multer';
 import { FilesService } from './files.service';
 import { fileFilter, fileNamer } from './helpers';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
 
 @Controller('files')
 export class FilesController {
@@ -31,9 +35,21 @@ export class FilesController {
       if (!file) {
         throw new NotFoundException('File is empty');
       }
-      return 'upload file';
+      return {
+        fileUrl: file.filename,
+      };
     } catch (error) {
       throw new UnprocessableEntityException(error);
     }
+  }
+
+  @Get('/:imageName')
+  findProductImage(
+    @Res() res: Response,
+    @Param('imageName') imageName: string,
+  ) {
+    const path = this.filesService.getStaticFile(imageName);
+
+    res.status(200).sendFile(path);
   }
 }
