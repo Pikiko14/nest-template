@@ -13,3 +13,13 @@
 ```
 docker compose up -d
 ```
+
+6. Levantar el proyecto
+```
+npm run start:dev || yarn start:dev
+```
+
+7. Ejecutar SEEDS
+```
+{api_url}/api/seed
+```
