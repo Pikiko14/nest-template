@@ -9,6 +9,6 @@ export class ProductImage {
   @Column('text')
   url: string;
 
-  @ManyToOne(() => Product, (product) => product.images, { eager: true })
+  @ManyToOne(() => Product, (product) => product.images, { eager: false })
   product: Product;
 }

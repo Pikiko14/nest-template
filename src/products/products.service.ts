@@ -7,8 +7,8 @@ import {
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { validate as isValidUUID } from 'uuid';
+import { ProductImage, Product } from './entities';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Product } from './entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
@@ -20,11 +20,19 @@ export class ProductsService {
   constructor(
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
+    @InjectRepository(ProductImage)
+    private readonly productImageRepository: Repository<ProductImage>,
   ) {}
 
   async create(createProductDto: CreateProductDto) {
     try {
-      const product = this.productRepository.create(createProductDto);
+      const { images, ...details } = createProductDto;
+      const product = this.productRepository.create({
+        ...details,
+        images: images.map((image) =>
+          this.productImageRepository.create({ url: image }),
+        ),
+      });
       await this.productRepository.save(product);
       return product;
     } catch (error) {
@@ -38,6 +46,9 @@ export class ProductsService {
       const products = await this.productRepository.find({
         take: limit,
         skip: offset,
+        relations: {
+          images: true,
+        },
       });
       return products;
     } catch (error) {
@@ -49,12 +60,14 @@ export class ProductsService {
     try {
       let product;
       if (!isValidUUID(term)) {
-        const queryBuilder = this.productRepository.createQueryBuilder();
+        const queryBuilder =
+          this.productRepository.createQueryBuilder('product');
         product = await queryBuilder
           .where('UPPER(title) =:title or LOWER(slug) =:slug', {
             title: term.toUpperCase(),
             slug: term.toLocaleLowerCase(),
           })
+          .leftJoinAndSelect('product.images', 'productImages')
           .getOne();
       } else {
         product = await this.productRepository.findOneBy({ id: term });
@@ -68,9 +81,13 @@ export class ProductsService {
 
   async update(id: string, updateProductDto: UpdateProductDto) {
     try {
+      const { images, ...details } = updateProductDto;
       const product = await this.productRepository.preload({
         id,
-        ...updateProductDto,
+        ...details,
+        images: images.map((image) =>
+          this.productImageRepository.create({ url: image }),
+        ),
       });
       if (!product) throw new NotFoundException('Product #${id} not found');
       await this.productRepository.save(product);
