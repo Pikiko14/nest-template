@@ -9,9 +9,11 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { LoginUserDto } from './dto';
+import { JwtService } from '@nestjs/jwt';
 import { User } from './entities/users.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
+import { JwtPayloadInterface } from './interfaces/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
@@ -20,6 +22,7 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly jwtService: JwtService,
   ) {}
 
   async create(createAuthDto: CreateUserDto) {
@@ -29,9 +32,16 @@ export class AuthService {
         ...userData,
         password: await bcrypt.hash(password, 10),
       });
+
       await this.userRepository.save(user);
       delete user.password;
-      return user;
+
+      const token = await this.getJwtToken({ id: user.id });
+
+      return {
+        user,
+        token,
+      };
     } catch (error) {
       this.handleDBExceptions(error);
     }
@@ -47,6 +57,7 @@ export class AuthService {
       select: {
         email: true,
         password: true,
+        id: true,
       },
     });
     if (!user)
@@ -55,7 +66,21 @@ export class AuthService {
     if (!(await bcrypt.compare(password, user.password)))
       throw new UnauthorizedException('Password incorrect');
 
-    return user;
+    const token = await this.getJwtToken({ id: user.id });
+
+    return {
+      user,
+      token,
+    };
+  }
+
+  private async getJwtToken(payload: JwtPayloadInterface): Promise<string> {
+    try {
+      const token = await this.jwtService.signAsync(payload);
+      return token;
+    } catch (error) {
+      this.handleDBExceptions(error);
+    }
   }
 
   private handleDBExceptions(error: any) {
